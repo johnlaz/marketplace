@@ -701,8 +701,10 @@ document.getElementById('fileBtn').addEventListener('click', () => document.getE
 
 async function handleScan(e) {
   const file = e.target.files[0]; if (!file) return;
+  // Reset UI state without nulling currentScan so async results can be stored
+  document.getElementById('listingCard').style.display = 'none';
+  document.getElementById('scanCardBody').innerHTML = '';
   currentScan = {};
-  resetScan();
   const { base64, mimeType, dataUrl } = await fileToBase64(file);
   currentScan.imageDataUrl = dataUrl;
   startProgress();
