@@ -895,10 +895,19 @@ document.getElementById('editSaveBtn').addEventListener('click', () => {
 function confirmDelete(id) { if (confirm('Delete this item?')) { deleteFromLedger(id); renderLedger(); toast('Deleted', 'info'); } }
 
 // EXPORT
-document.getElementById('exportBtn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(getLedger(), null, 2)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `market_inventory_${new Date().toISOString().split('T')[0]}.json`; a.click();
-  toast('Ledger exported ✓', 'success');
+document.getElementById('exportBtn').addEventListener('click', async () => {
+  const ledger = getLedger();
+  toast('Building export...', 'info', 2000);
+  // Bundle each item with its images embedded as base64
+  const items = await Promise.all(ledger.map(async item => {
+    const imgDataUrl = await loadImage(item.id);
+    const heroDataUrl = await loadImage(item.id + '_hero');
+    return { ...item, _imgDataUrl: imgDataUrl || null, _heroDataUrl: heroDataUrl || null };
+  }));
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `market_inventory_${new Date().toISOString().split('T')[0]}.json`; a.click();
+  toast('Ledger exported with photos ✓', 'success');
 });
 
 // IMPORT LEDGER
@@ -909,7 +918,13 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
     if (!Array.isArray(incoming)) throw new Error('Invalid format — expected a JSON array.');
     const existIds = new Set(getLedger().map(i => i.id));
     const newItems = incoming.filter(i => i.id && !existIds.has(i.id));
-    saveLedger([...newItems, ...getLedger()]); renderLedger();
+    // Restore images from embedded base64, then strip them from the ledger record
+    await Promise.all(newItems.map(async item => {
+      if (item._imgDataUrl) await saveImage(item.id, item._imgDataUrl);
+      if (item._heroDataUrl) await saveImage(item.id + '_hero', item._heroDataUrl);
+    }));
+    const cleanItems = newItems.map(({ _imgDataUrl, _heroDataUrl, ...rest }) => rest);
+    saveLedger([...cleanItems, ...getLedger()]); renderLedger();
     toast(`Imported ${newItems.length} new item${newItems.length!==1?'s':''} ✓`, 'success');
     const skipped = incoming.length - newItems.length;
     if (skipped > 0) toast(`${skipped} duplicate(s) skipped`, 'info');
