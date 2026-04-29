@@ -337,24 +337,15 @@
   <div class="tab" data-tab="ledger">📋 Ledger</div>
 </div>
 
-<!-- SCAN VIEW -->
-<div class="view active" id="view-scan">
-  <!-- Hidden file inputs -->
+<!-- SCAN VIEW -->\n<div class="view active" id="view-scan">
+  <!-- Hidden file input - camera only -->
   <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
-  <input type="file" id="fileInput" accept="image/*" style="display:none">
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-    <button class="scan-zone" id="cameraBtn" type="button" style="margin-bottom:0;width:100%;cursor:pointer">
-      <div class="scan-icon">📷</div>
-      <strong>Take Photo</strong>
-      <p>Open camera</p>
-    </button>
-    <button class="scan-zone" id="fileBtn" type="button" style="margin-bottom:0;width:100%;cursor:pointer">
-      <div class="scan-icon">🖼️</div>
-      <strong>Choose File</strong>
-      <p>Gallery or files</p>
-    </button>
-  </div>
+  <button class="scan-zone" id="cameraBtn" type="button" style="width:100%;cursor:pointer">
+    <div class="scan-icon">📷</div>
+    <strong>Take Photo</strong>
+    <p>Tap to open camera</p>
+  </button>
   <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="listing-card" id="listingCard" style="display:none">
     <div class="card-header">
@@ -502,6 +493,21 @@ function startProgress() {
 function endProgress() { clearInterval(progressInterval); document.getElementById('progressFill').style.width = '100%'; setTimeout(() => document.getElementById('progressBar').classList.remove('active'), 500); }
 
 // ===== API =====
+function safeParseJSON(raw) {
+  // 1. Strip markdown fences
+  let s = raw.replace(/```json|```/g, '').trim();
+  // 2. Extract the first {...} block in case model adds prose around it
+  const match = s.match(/\{[\s\S]*\}/);
+  if (match) s = match[0];
+  // 3. Replace literal control characters inside JSON strings with their escape sequences
+  //    (handles real newlines, tabs, carriage returns that break JSON.parse)
+  s = s.replace(/[\u0000-\u001F\u007F]/g, ch => {
+    const escapes = { '\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f' };
+    return escapes[ch] || '';
+  });
+  return JSON.parse(s);
+}
+
 async function identifyImage(base64, mimeType) {
   const key = getSettings().groqKey; if (!key) throw new Error('No Groq API key. Add one in Settings.');
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -510,7 +516,7 @@ async function identifyImage(base64, mimeType) {
   });
   if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'Groq vision error'); }
   const data = await res.json();
-  return JSON.parse(data.choices[0].message.content.trim().replace(/```json|```/g, '').trim());
+  return safeParseJSON(data.choices[0].message.content);
 }
 async function generateDescription(metadata, style) {
   const key = getSettings().groqKey; if (!key) throw new Error('No Groq API key.');
@@ -520,7 +526,7 @@ async function generateDescription(metadata, style) {
   });
   if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'Groq text error'); }
   const data = await res.json();
-  return JSON.parse(data.choices[0].message.content.trim().replace(/```json|```/g, '').trim());
+  return safeParseJSON(data.choices[0].message.content);
 }
 async function generateHeroShot(itemName, brand) {
   const s = getSettings(), subject = [brand, itemName].filter(Boolean).join(' ');
@@ -540,9 +546,27 @@ async function generateHeroShot(itemName, brand) {
 }
 function fileToBase64(file) {
   return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res({ base64: r.result.split(',')[1], mimeType: file.type, dataUrl: r.result });
-    r.onerror = rej; r.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onerror = rej;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = rej;
+      img.onload = () => {
+        const MAX = 1024;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        res({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', dataUrl });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   });
 }
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -697,7 +721,7 @@ function resetScan() { currentScan = null; document.getElementById('listingCard'
 
 // Button → hidden input triggers
 document.getElementById('cameraBtn').addEventListener('click', () => document.getElementById('photoInput').click());
-document.getElementById('fileBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+
 
 async function handleScan(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -733,7 +757,7 @@ async function handleScan(e) {
 }
 
 document.getElementById('photoInput').addEventListener('change', handleScan);
-document.getElementById('fileInput').addEventListener('change', handleScan);
+
 
 document.getElementById('resetBtn').addEventListener('click', resetScan);
 
