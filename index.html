@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MarketMaster">
@@ -233,14 +233,14 @@
   .generating-overlay span { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
 
   .filter-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-  .filter-chip { flex-shrink: 0; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(240,192,64,0.08); }
 
   /* LEDGER TOOLBAR */
-  .ledger-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .ledger-toolbar-left { display: flex; gap: 8px; flex: 1; overflow-x: auto; padding-bottom: 2px; }
+  .ledger-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .ledger-toolbar-left { flex: 1; min-width: 0; }
   .ledger-toolbar-right { display: flex; gap: 6px; flex-shrink: 0; }
-  .sort-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 28px 6px 10px; outline: none; cursor: pointer; transition: border-color 0.15s; }
+  .filter-select { width: 100%; background: rgba(240,192,64,0.06); border: 1px solid rgba(240,192,64,0.35); border-radius: 8px; color: var(--accent); font-family: var(--font-body); font-size: 13px; font-weight: 700; padding: 7px 30px 7px 12px; outline: none; cursor: pointer; transition: border-color 0.15s; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f0c040' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; }
+  .filter-select:focus { border-color: var(--accent); }
+  .sort-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 28px 6px 10px; outline: none; cursor: pointer; transition: border-color 0.15s; -webkit-appearance: none; appearance: none; }
   .sort-select:focus { border-color: var(--accent); }
   .view-toggle-btn { width: 34px; height: 34px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.15s; flex-shrink: 0; }
   .view-toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(240,192,64,0.08); }
@@ -366,11 +366,13 @@
   </div>
   <!-- TOOLBAR: filters + sort + view toggle -->
   <div class="ledger-toolbar">
-    <div class="ledger-toolbar-left" id="filterBar">
-      <div class="filter-chip active" data-filter="All">All</div>
-      <div class="filter-chip" data-filter="Active">Active</div>
-      <div class="filter-chip" data-filter="Sold">Sold</div>
-      <div class="filter-chip" data-filter="Draft">Draft</div>
+    <div class="ledger-toolbar-left">
+      <select class="filter-select" id="filterSelect">
+        <option value="All">📋 All Items</option>
+        <option value="Active">🟢 Active</option>
+        <option value="Sold">✅ Sold</option>
+        <option value="Draft">📝 Draft</option>
+      </select>
     </div>
     <div class="ledger-toolbar-right">
       <select class="sort-select" id="sortSelect" title="Sort by">
@@ -852,10 +854,8 @@ async function renderLedger() {
   list.innerHTML = cards.join('');
 }
 
-document.getElementById('filterBar').addEventListener('click', e => {
-  const chip = e.target.closest('.filter-chip'); if (!chip) return;
-  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-  chip.classList.add('active'); activeFilter = chip.dataset.filter; renderLedger();
+document.getElementById('filterSelect').addEventListener('change', e => {
+  activeFilter = e.target.value; renderLedger();
 });
 
 // Sort
